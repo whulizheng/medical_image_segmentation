@@ -1,0 +1,20 @@
+{
+    "general":{
+        "epochs":10,
+        "batch_size":16,
+        "augmentation":true
+    },
+    "data":{
+        "Brain Dummy":{
+            "data_path":"C:/Users/WhuLi/Documents/archive/lgg-mri-segmentation/dummy/",
+            "data_loader":1
+        },
+        "Brain MRI":{
+            "data_path":"C:/Users/WhuLi/Documents/archive/lgg-mri-segmentation/kaggle_3m/",
+            "data_loader":1
+        }
+    },
+    "model":{
+
+    }
+}
