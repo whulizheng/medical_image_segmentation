@@ -1,14 +1,23 @@
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch
 import numpy as np
+
+import warnings
+
 import time
-from Models import dummy
+from Models import Unet
 import Utils
 
 
 def main():
     config = Utils.load_json("config.json")
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = None
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+        pass
+    else:
+        device = torch.device('cpu')
+
     dataset = Utils.Brain_data(config["data"]["Brain Dummy"]["data_path"])
     # show shape of images
     '''
@@ -29,10 +38,17 @@ def main():
     '''
 
     # init model
-    model = dummy.dummy((3, 256, 256)).to(device)
-    criterion = dummy.DiceBCELoss()
+    model = Unet.Unet((3, 256, 256))
+    criterion = Unet.DiceBCELoss()
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        model = torch.nn.DataParallel(model)
+    model.to(device)
+    
+    
     # train
     epochs = config["general"]["epochs"]
     train_loss = []
@@ -77,4 +93,5 @@ def main():
 
 
 if __name__ == "__main__":
+    warnings.filterwarnings('ignore')
     main()
