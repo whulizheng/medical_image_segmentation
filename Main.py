@@ -5,7 +5,7 @@ import numpy as np
 import warnings
 
 import time
-from Models import Unet
+from Models import Unet2
 import Utils
 
 
@@ -38,8 +38,8 @@ def main():
     '''
 
     # init model
-    model = Unet.Unet((3, 256, 256))
-    criterion = Unet.DiceBCELoss()
+    model = Unet2.UNet((3, 256, 256))
+    criterion = Unet2.DiceLoss()
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
