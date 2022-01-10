@@ -5,7 +5,7 @@ import numpy as np
 import warnings
 
 import time
-from Models import name_net
+from Models import Unet
 import Utils
 
 
@@ -38,8 +38,12 @@ def main():
     '''
 
     # init model
-    model = name_net.name_net((3, 256, 256))
-    criterion = name_net.DiceBCELoss()
+    model = Unet.Unet((3, 256, 256))
+    criterion = Unet.DiceBCELoss()
+    criterion_test_1 = Unet.IoU()
+    criterion_test_2 = Unet.DiceScore()
+
+
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -59,6 +63,8 @@ def main():
         start_time = time.time()
 
         running_train_loss = []
+        running_train_IoU = []
+        running_train_DiceScore = []
 
         for image, mask in train_loader:
             image = image.to(device, dtype=torch.float)
@@ -66,26 +72,44 @@ def main():
 
             pred_mask = model.forward(image)  # forward propogation
             loss = criterion(pred_mask, mask)
+            IoU = criterion_test_1(pred_mask, mask)
+            Dice = criterion_test_2(pred_mask,mask)
             optimizer.zero_grad()  # setting gradient to zero
             loss.backward()
             optimizer.step()
             running_train_loss.append(loss.item())
+            running_train_IoU.append(IoU.item())
+            running_train_DiceScore.append(Dice.item())
         else:
             running_val_loss = []
+            running_val_IoU = []
+            running_val_DiceScore = []
             with torch.no_grad():
                 for image, mask in test_loader:
                     image = image.to(device, dtype=torch.float)
                     mask = mask.to(device, dtype=torch.float)
                     pred_mask = model.forward(image)
                     loss = criterion(pred_mask, mask)
+                    IoU = criterion_test_1(pred_mask, mask)
+                    Dice = criterion_test_2(pred_mask,mask)
                     running_val_loss.append(loss.item())
+                    running_val_IoU.append(IoU.item())
+                    running_val_DiceScore.append(Dice.item())
 
         epoch_train_loss = np.mean(running_train_loss)
+        epoch_train_IoU = np.mean(running_train_IoU)
+        epoch_train_DiceScore = np.mean(running_train_DiceScore)
         print('Train loss: {}'.format(epoch_train_loss))
+        print('Train IoU: {}'.format(epoch_train_IoU))
+        print('Train DiceScore: {}'.format(epoch_train_DiceScore))
         train_loss.append(epoch_train_loss)
 
         epoch_val_loss = np.mean(running_val_loss)
+        epoch_val_IoU = np.mean(running_val_IoU)
+        epoch_val_DiceScore = np.mean(running_val_DiceScore)
         print('Validation loss: {}'.format(epoch_val_loss))
+        print('Validation IoU: {}'.format(epoch_val_IoU))
+        print('Validation DiceScore: {}'.format(epoch_val_DiceScore))
         val_loss.append(epoch_val_loss)
 
         time_elapsed = time.time() - start_time
