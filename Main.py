@@ -1,11 +1,11 @@
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch
 import numpy as np
-
+import albumentations as A
 import warnings
 
 import time
-from Models import Unet
+from Models import Unet3
 import Utils
 
 
@@ -18,7 +18,20 @@ def main():
     else:
         device = torch.device('cpu')
 
-    dataset = Utils.Brain_data(config["data"]["Brain Dummy"]["data_path"])
+    # augmentation
+    transform = None
+    if config["general"]["augmentation"]:
+        transform = A.Compose([
+            A.Resize(width=256, height=256, p=1.0),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.01, scale_limit=0.04,
+                               rotate_limit=0, p=0.25),
+        ])
+    dataset = Utils.Brain_data(
+        config["data"]["Brain Dummy"]["data_path"], transform)
+
     # show shape of images
     '''
     for img, msk in dataset:
@@ -36,13 +49,11 @@ def main():
     '''
     Utils.plot_img(5, train_loader, device)
     '''
-
     # init model
-    model = Unet.Unet((3, 256, 256))
-    criterion = Unet.DiceBCELoss()
-    criterion_test_1 = Unet.IoU()
-    criterion_test_2 = Unet.DiceScore()
-
+    model = Unet3.Unet((3, 256, 256))
+    criterion = Unet3.DiceBCELoss()
+    criterion_test_1 = Unet3.IoU()
+    criterion_test_2 = Unet3.DiceScore()
 
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -51,8 +62,7 @@ def main():
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = torch.nn.DataParallel(model)
     model.to(device)
-    
-    
+
     # train
     epochs = config["general"]["epochs"]
     train_loss = []
@@ -73,7 +83,7 @@ def main():
             pred_mask = model.forward(image)  # forward propogation
             loss = criterion(pred_mask, mask)
             IoU = criterion_test_1(pred_mask, mask)
-            Dice = criterion_test_2(pred_mask,mask)
+            Dice = criterion_test_2(pred_mask, mask)
             optimizer.zero_grad()  # setting gradient to zero
             loss.backward()
             optimizer.step()
@@ -91,7 +101,7 @@ def main():
                     pred_mask = model.forward(image)
                     loss = criterion(pred_mask, mask)
                     IoU = criterion_test_1(pred_mask, mask)
-                    Dice = criterion_test_2(pred_mask,mask)
+                    Dice = criterion_test_2(pred_mask, mask)
                     running_val_loss.append(loss.item())
                     running_val_IoU.append(IoU.item())
                     running_val_DiceScore.append(Dice.item())
