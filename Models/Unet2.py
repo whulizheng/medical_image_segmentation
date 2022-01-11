@@ -123,18 +123,62 @@ class UNet(nn.Module):
         )
 
 
-class DiceLoss(nn.Module):
+def dice_coef_metric(pred, label):
+    intersection = 2.0 * (pred * label).sum()
+    union = pred.sum() + label.sum()
+    if pred.sum() == 0 and label.sum() == 0:
+        return 1.
+    return intersection / union
+def dice_coef_loss(pred, label):
+    smooth = 1.0
+    intersection = 2.0 * (pred * label).sum() + smooth
+    union = pred.sum() + label.sum() + smooth
+    return 1 - (intersection / union)
 
-    def __init__(self):
-        super(DiceLoss, self).__init__()
-        self.smooth = 1.0
+class DiceBCELoss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(DiceBCELoss, self).__init__()
 
-    def forward(self, y_pred, y_true):
-        assert y_pred.size() == y_true.size()
-        y_pred = y_pred[:, 0].contiguous().view(-1)
-        y_true = y_true[:, 0].contiguous().view(-1)
-        intersection = (y_pred * y_true).sum()
-        dsc = (2. * intersection + self.smooth) / (
-            y_pred.sum() + y_true.sum() + self.smooth
-        )
-        return 1. - dsc
+    def forward(self, inputs, targets, smooth=1):
+        
+        dice_loss = dice_coef_loss(inputs, targets)
+        bce_loss = nn.BCELoss()(inputs, targets)
+        return dice_loss + bce_loss
+    
+    
+
+class IoU(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(IoU, self).__init__()
+
+    def forward(self, inputs, targets, smooth=1):
+        
+        #comment out if your model contains a sigmoid or equivalent activation layer
+        inputs = torch.sigmoid(inputs)       
+        
+        #flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+        
+        #intersection is equivalent to True Positive count
+        #union is the mutually inclusive area of all labels & predictions 
+        intersection = (inputs * targets).sum()
+        total = (inputs + targets).sum()
+        union = total - intersection 
+        
+        IoU = (intersection + smooth)/(union + smooth)
+                
+        return IoU * 100
+
+    
+class DiceScore(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(DiceScore, self).__init__()
+
+    def forward(self, inputs, targets, smooth=1):
+        intersection = 2.0 * (inputs * targets).sum()
+        union = inputs.sum() + targets.sum()
+        if inputs.sum() == 0 and targets.sum() == 0:
+            return 1.
+        return intersection / union
+        

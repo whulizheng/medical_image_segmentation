@@ -117,9 +117,9 @@ def main():
         epoch_val_loss = np.mean(running_val_loss)
         epoch_val_IoU = np.mean(running_val_IoU)
         epoch_val_DiceScore = np.mean(running_val_DiceScore)
-        print('Validation loss: {}'.format(epoch_val_loss))
-        print('Validation IoU: {}'.format(epoch_val_IoU))
-        print('Validation DiceScore: {}'.format(epoch_val_DiceScore))
+        print('Test loss: {}'.format(epoch_val_loss))
+        print('Test IoU: {}'.format(epoch_val_IoU))
+        print('Test DiceScore: {}'.format(epoch_val_DiceScore))
         val_loss.append(epoch_val_loss)
 
         time_elapsed = time.time() - start_time

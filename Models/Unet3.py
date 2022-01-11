@@ -97,6 +97,17 @@ class OutConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+def dice_coef_metric(pred, label):
+    intersection = 2.0 * (pred * label).sum()
+    union = pred.sum() + label.sum()
+    if pred.sum() == 0 and label.sum() == 0:
+        return 1.
+    return intersection / union
+def dice_coef_loss(pred, label):
+    smooth = 1.0
+    intersection = 2.0 * (pred * label).sum() + smooth
+    union = pred.sum() + label.sum() + smooth
+    return 1 - (intersection / union)
 
 class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
@@ -104,18 +115,9 @@ class DiceBCELoss(nn.Module):
 
     def forward(self, inputs, targets, smooth=1):
         
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = torch.sigmoid(inputs)       
-        bce_weight = 0.5
-        #flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
-        
-        intersection = (inputs * targets).sum()                            
-        dice_loss = 1 - (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)  
-        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
-        loss_final = BCE * bce_weight + dice_loss * (1 - bce_weight)
-        return loss_final
+        dice_loss = dice_coef_loss(inputs, targets)
+        bce_loss = nn.BCELoss()(inputs, targets)
+        return dice_loss + bce_loss
     
     
 
@@ -148,15 +150,9 @@ class DiceScore(nn.Module):
         super(DiceScore, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
+        intersection = 2.0 * (inputs * targets).sum()
+        union = inputs.sum() + targets.sum()
+        if inputs.sum() == 0 and targets.sum() == 0:
+            return 1.
+        return intersection / union
         
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = torch.sigmoid(inputs)       
-        
-        #flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
-        
-        intersection = (inputs * targets).sum()                            
-        dice_score = (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth) 
-        return dice_score
-    
