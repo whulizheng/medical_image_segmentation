@@ -8,11 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms as T
 
-class Unet(nn.Module):
+class Model(nn.Module):
     def __init__(self, input_shape, bilinear=True):
-        super(Unet, self).__init__()
+        super(Model, self).__init__()
         channel, height, width = input_shape
-
+        self.name = "Unet_pro"
         self.n_channels = channel
         self.n_classes = 1
         self.bilinear = bilinear
@@ -109,9 +109,9 @@ def dice_coef_loss(pred, label):
     union = pred.sum() + label.sum() + smooth
     return 1 - (intersection / union)
 
-class DiceBCELoss(nn.Module):
+class Loss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(DiceBCELoss, self).__init__()
+        super(Loss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
         
@@ -119,40 +119,5 @@ class DiceBCELoss(nn.Module):
         bce_loss = nn.BCELoss()(inputs, targets)
         return dice_loss + bce_loss
     
-    
 
-class IoU(nn.Module):
-    def __init__(self, weight=None, size_average=True):
-        super(IoU, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = torch.sigmoid(inputs)       
-        
-        #flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
-        
-        #intersection is equivalent to True Positive count
-        #union is the mutually inclusive area of all labels & predictions 
-        intersection = (inputs * targets).sum()
-        total = (inputs + targets).sum()
-        union = total - intersection 
-        
-        IoU = (intersection + smooth)/(union + smooth)
-                
-        return IoU * 100
-
-    
-class DiceScore(nn.Module):
-    def __init__(self, weight=None, size_average=True):
-        super(DiceScore, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        intersection = 2.0 * (inputs * targets).sum()
-        union = inputs.sum() + targets.sum()
-        if inputs.sum() == 0 and targets.sum() == 0:
-            return 1.
-        return intersection / union
         

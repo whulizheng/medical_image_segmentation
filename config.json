@@ -1,8 +1,16 @@
 {
     "general":{
-        "epochs":10,
+        "models":["Unet","Unet_pro","Transformer_CNN_Unet_mix","Transformer_pure"],
+        "chosen_models":[0,1,2,3],
+        "datasets":["Brain Dummy","Brain MRI"],
+        "chosen_dataset":0,
+        "width":256,
+        "height":256,
+        "input_channels":3,
+        "epochs":3,
         "batch_size":16,
-        "augmentation":true
+        "augmentation":true,
+        "if_save_models":false
     },
     "data":{
         "Brain Dummy":{
@@ -14,7 +22,8 @@
             "data_loader":1
         }
     },
-    "model":{
-
+    "evaluation":{
+        "methods":["DiceScore","IoU"],
+        "chosen_methods":[0,1]
     }
 }

@@ -3,127 +3,206 @@ import torch
 import numpy as np
 import albumentations as A
 import warnings
-
 import time
-from Models import Unet3
 import Utils
 
 
-def main():
-    config = Utils.load_json("config.json")
-    device = None
+def device_prepare():
     if torch.cuda.is_available():
-        device = torch.device('cuda:0')
-        pass
-    else:
-        device = torch.device('cpu')
+        print("Using GPU")
+        return torch.device('cuda:0')
 
-    # augmentation
-    transform = None
-    if config["general"]["augmentation"]:
-        transform = A.Compose([
-            A.Resize(width=256, height=256, p=1.0),
+    else:
+        print("Using CPU")
+        return torch.device('cpu')
+
+
+def define_augmentation(if_aug, width, height):
+    if if_aug:
+        return A.Compose([
+            A.Resize(width=width, height=height, p=1.0),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
             A.ShiftScaleRotate(shift_limit=0.01, scale_limit=0.04,
                                rotate_limit=0, p=0.25),
         ])
-    dataset = Utils.Brain_data(
-        config["data"]["Brain Dummy"]["data_path"], transform)
+    else:
+        return A.Compose([
+            A.Resize(width=width, height=height, p=1.0),
+        ])
 
-    # show shape of images
-    '''
-    for img, msk in dataset:
-        print(img.shape)
-        print(msk.shape)
-        break
-    '''
+
+def dataset_prepare(config, transform):
+    dataset = Utils.Brain_data(
+        config["data"][config["general"]["datasets"][config["general"]["chosen_dataset"]]]["data_path"], transform)
     trainset, testset = random_split(dataset, [int(
         dataset.__len__()*0.9), int(dataset.__len__()-int(dataset.__len__()*0.9))])
     train_loader = torch.utils.data.DataLoader(
         dataset=trainset, batch_size=config["general"]["batch_size"], shuffle=True)
     test_loader = torch.utils.data.DataLoader(
         dataset=testset, batch_size=config["general"]["batch_size"])
-    # show 5 training iamges
-    '''
-    Utils.plot_img(5, train_loader, device)
-    '''
-    # init model
-    model = Unet3.Unet((3, 256, 256))
-    criterion = Unet3.DiceBCELoss()
-    criterion_test_1 = Unet3.IoU()
-    criterion_test_2 = Unet3.DiceScore()
+    return train_loader, test_loader
 
-    learning_rate = 1e-3
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        model = torch.nn.DataParallel(model)
-    model.to(device)
+def init_evaluation(name, config):
+    if name == "DiceScore":
+        from Evaluations import DiceScore
+        method = DiceScore.DiceScore()
+        return method
+    elif name == "IoU":
+        from Evaluations import IoU
+        method = IoU.IoU()
+        return method
+    else:
+        print("Wrong Evaluation Name")
+        exit(-1)
 
-    # train
-    epochs = config["general"]["epochs"]
+
+def init_models(name, config):
+    if name == "Unet":
+        from Models import Unet
+        model = Unet.Model((config["general"]["input_channels"],
+                           config["general"]["width"], config["general"]["height"]))
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        criterion = Unet.Loss()
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Unet_pro":
+        from Models import Unet_pro
+        model = Unet_pro.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Unet_pro.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Transformer_CNN_Unet_mix":
+        from Models import Transformer_CNN_Unet_mix
+        model = Transformer_CNN_Unet_mix.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_CNN_Unet_mix.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Transformer_pure":
+        from Models import Transformer_pure
+        model = Transformer_pure.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_pure.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    else:
+        print("Wrong Model Name")
+        exit(-1)
+
+
+def train(model,criterion,optimizer, device, train_loader, test_loader, epochs):
     train_loss = []
-    val_loss = []
-
+    test_loss = []
     for epoch in range(epochs):
         print('Epoch {}/{}'.format(epoch + 1, epochs))
         start_time = time.time()
-
         running_train_loss = []
-        running_train_IoU = []
-        running_train_DiceScore = []
-
         for image, mask in train_loader:
             image = image.to(device, dtype=torch.float)
             mask = mask.to(device, dtype=torch.float)
-
             pred_mask = model.forward(image)  # forward propogation
             loss = criterion(pred_mask, mask)
-            IoU = criterion_test_1(pred_mask, mask)
-            Dice = criterion_test_2(pred_mask, mask)
             optimizer.zero_grad()  # setting gradient to zero
             loss.backward()
             optimizer.step()
             running_train_loss.append(loss.item())
-            running_train_IoU.append(IoU.item())
-            running_train_DiceScore.append(Dice.item())
         else:
-            running_val_loss = []
-            running_val_IoU = []
-            running_val_DiceScore = []
+            running_test_loss = []
             with torch.no_grad():
                 for image, mask in test_loader:
                     image = image.to(device, dtype=torch.float)
                     mask = mask.to(device, dtype=torch.float)
                     pred_mask = model.forward(image)
                     loss = criterion(pred_mask, mask)
-                    IoU = criterion_test_1(pred_mask, mask)
-                    Dice = criterion_test_2(pred_mask, mask)
-                    running_val_loss.append(loss.item())
-                    running_val_IoU.append(IoU.item())
-                    running_val_DiceScore.append(Dice.item())
+                    running_test_loss.append(loss.item())
 
         epoch_train_loss = np.mean(running_train_loss)
-        epoch_train_IoU = np.mean(running_train_IoU)
-        epoch_train_DiceScore = np.mean(running_train_DiceScore)
         print('Train loss: {}'.format(epoch_train_loss))
-        print('Train IoU: {}'.format(epoch_train_IoU))
-        print('Train DiceScore: {}'.format(epoch_train_DiceScore))
         train_loss.append(epoch_train_loss)
 
-        epoch_val_loss = np.mean(running_val_loss)
-        epoch_val_IoU = np.mean(running_val_IoU)
-        epoch_val_DiceScore = np.mean(running_val_DiceScore)
-        print('Test loss: {}'.format(epoch_val_loss))
-        print('Test IoU: {}'.format(epoch_val_IoU))
-        print('Test DiceScore: {}'.format(epoch_val_DiceScore))
-        val_loss.append(epoch_val_loss)
+        epoch_test_loss = np.mean(running_test_loss)
+        print('Test loss: {}'.format(epoch_test_loss))
+        test_loss.append(epoch_test_loss)
 
         time_elapsed = time.time() - start_time
-        print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+        print('{:.0f}m {:.0f}s'.format(
+            time_elapsed // 60, time_elapsed % 60))
+    return model, train_loss, test_loss
+
+
+def main():
+    config = Utils.load_json("config.json")
+    device = device_prepare()
+    Utils.show_config(config)
+    # augmentation
+    transform = define_augmentation(
+        config["general"]["augmentation"], config["general"]["width"], config["general"]["height"])
+    if config["general"]["augmentation"]:
+        print("Data Augmenting...")
+    # prepare dataset
+    train_loader, test_loader = dataset_prepare(config, transform)
+    # train model
+    for i in config["general"]["chosen_models"]:
+        # init model
+        model_name = config["general"]["models"][i]
+        print("Training model: "+model_name)
+        model, criterion, optimizer = init_models(model_name, config)
+        model.to(device)
+
+        # train
+        epochs = config["general"]["epochs"]
+        model, train_loss, test_loss = train(
+            model,criterion,optimizer, device, train_loader, test_loader, epochs)
+
+        # evaluation
+        evaluations = {}
+        for e in config["evaluation"]["chosen_methods"]:
+            method_name = config["evaluation"]["methods"][e]
+            print("Evaluating Model: "+model_name+" By "+method_name)
+            method = init_evaluation(method_name, config)
+            scores = []
+            with torch.no_grad():
+                for image, mask in test_loader:
+                    image = image.to(device, dtype=torch.float)
+                    mask = mask.to(device, dtype=torch.float)
+                    pred_mask = model.forward(image)
+                    score = method(pred_mask, mask)
+                    scores.append(score.item())
+            evaluations[method_name] = np.mean(scores)
+            print("Model: "+model_name+" Got "+method_name +
+                  ": "+str(float(np.mean(scores))))
+
+        # save_log
+        Utils.save_log(model_name, config, train_loss, test_loss, evaluations=evaluations)
+
+        # save_model
+        if config["general"]["if_save_models"]:
+            date = time.strftime('%Y_%m_%d_%H_%M_%S',
+                                 time.localtime(time.time()))
+            path = "Saved_models/" + model_name + "_" + date + ".pt"
+            torch.save(model, path)
+            print("model "+model_name+" saved at: "+path)
+        
+        del model, criterion, optimizer
 
 
 if __name__ == "__main__":

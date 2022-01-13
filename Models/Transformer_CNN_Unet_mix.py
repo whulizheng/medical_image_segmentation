@@ -31,38 +31,51 @@ from matplotlib import pyplot as plt
 from skimage import io, transform
 
 
-class name_net(nn.Module):
+class Model(nn.Module):
     def __init__(self, input_shape):
-        super(name_net, self).__init__()
+        super(Model, self).__init__()
 
         channel, height, width = input_shape
-        self.conv1 = Conv2d(channel, 24, kernel_size=(1, 1), bias=True)
+        self.name = "Transformer_CNN_Unet_mix"
+        self.down1 = StackEncoder(channel, 24, kernel_size=(3, 3))
         self.a1 = TransformerBlock(24)
-        self.a2 = TransformerBlock(24)
-        self.a3 = TransformerBlock(24)
-        self.a4 = TransformerBlock(24)
-        self.a5 = TransformerBlock(24)
-        self.a6 = TransformerBlock(24)
-        self.a7 = TransformerBlock(24)
-        self.a8 = TransformerBlock(24)
-        self.a9 = TransformerBlock(24)
+        self.down2 = StackEncoder(24, 48, kernel_size=(3, 3))
+        self.down3 = StackEncoder(48, 96, kernel_size=(3, 3))
+
+        self.center = ConvBlock(96, 96, kernel_size=(3, 3), padding=1)
+
         
-        self.conv2 = Conv2d(24, 1, kernel_size=(1, 1), bias=True)
+        self.up3 = StackDecoder(96, 96, 48, kernel_size=(3, 3))
+        self.up2 = StackDecoder(48, 48, 24, kernel_size=(3, 3))
+        self.a2 = TransformerBlock(24)
+        self.up1 = StackDecoder(24, 24, 24, kernel_size=(3, 3))
+        self.conv = OutConv(24,1)
 
     def forward(self, x):
-        out = self.conv1(x)
+        down1, out = self.down1(x)
         out = self.a1(out)
-        out = self.a2(out)
-        out = self.a3(out)
-        out = self.a4(out)
-        out = self.a5(out)
-        out = self.a6(out)
-        out = self.a7(out)
-        out = self.a8(out)
-        out = self.a9(out)
-        out = self.conv2(out)
+        down2, out = self.down2(out)
+        down3, out = self.down3(out)
+
+        out = self.center(out)
+
+        up3 = self.up3(out, down3)
+        up2 = self.up2(up3, down2)
+        up2 = self.a2(up2)
+        up1 = self.up1(up2, down1)
+
+        out = self.conv(up1)
+
         return out
 
+class OutConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(OutConv, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=1),
+            nn.Sigmoid())
+    def forward(self, x):
+        return self.conv(x)
 
 class StackEncoder(nn.Module):
     def __init__(self, channel1, channel2, kernel_size=(3, 3), padding=1):
@@ -111,66 +124,6 @@ class ConvBlock(nn.Module):
         x = self.relu(x)
         return x
 
-
-def dice_coef_metric(pred, label):
-    intersection = 2.0 * (pred * label).sum()
-    union = pred.sum() + label.sum()
-    if pred.sum() == 0 and label.sum() == 0:
-        return 1.
-    return intersection / union
-def dice_coef_loss(pred, label):
-    smooth = 1.0
-    intersection = 2.0 * (pred * label).sum() + smooth
-    union = pred.sum() + label.sum() + smooth
-    return 1 - (intersection / union)
-
-class DiceBCELoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
-        super(DiceBCELoss, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        
-        dice_loss = dice_coef_loss(inputs, targets)
-        bce_loss = nn.BCELoss()(inputs, targets)
-        return dice_loss + bce_loss
-    
-    
-
-class IoU(nn.Module):
-    def __init__(self, weight=None, size_average=True):
-        super(IoU, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = torch.sigmoid(inputs)       
-        
-        #flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
-        
-        #intersection is equivalent to True Positive count
-        #union is the mutually inclusive area of all labels & predictions 
-        intersection = (inputs * targets).sum()
-        total = (inputs + targets).sum()
-        union = total - intersection 
-        
-        IoU = (intersection + smooth)/(union + smooth)
-                
-        return IoU * 100
-
-    
-class DiceScore(nn.Module):
-    def __init__(self, weight=None, size_average=True):
-        super(DiceScore, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        intersection = 2.0 * (inputs * targets).sum()
-        union = inputs.sum() + targets.sum()
-        if inputs.sum() == 0 and targets.sum() == 0:
-            return 1.
-        return intersection / union
-        
 
 
 class PatchEmbedding(nn.Module):
@@ -290,3 +243,25 @@ class TransformerBlock(nn.Module):
             B, C, H, W)
         out = self.deconv(out)
         return out
+
+def dice_coef_metric(pred, label):
+    intersection = 2.0 * (pred * label).sum()
+    union = pred.sum() + label.sum()
+    if pred.sum() == 0 and label.sum() == 0:
+        return 1.
+    return intersection / union
+def dice_coef_loss(pred, label):
+    smooth = 1.0
+    intersection = 2.0 * (pred * label).sum() + smooth
+    union = pred.sum() + label.sum() + smooth
+    return 1 - (intersection / union)
+
+class Loss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(Loss, self).__init__()
+
+    def forward(self, inputs, targets, smooth=1):
+        
+        dice_loss = dice_coef_loss(inputs, targets)
+        bce_loss = nn.BCELoss()(inputs, targets)
+        return dice_loss + bce_loss
