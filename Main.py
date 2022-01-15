@@ -82,11 +82,22 @@ def init_models(name, config):
             print("Let's use", torch.cuda.device_count(), "GPUs!")
             model = torch.nn.DataParallel(model)
         return model, criterion, optimizer
-    elif name == "Transformer_CNN_Unet_mix":
-        from Models import Transformer_CNN_Unet_mix
-        model = Transformer_CNN_Unet_mix.Model(
+    elif name == "Transformer_CNN_Unet_mix_p1":
+        from Models import Transformer_CNN_Unet_mix_p1
+        model = Transformer_CNN_Unet_mix_p1.Model(
             (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
-        criterion = Transformer_CNN_Unet_mix.Loss()
+        criterion = Transformer_CNN_Unet_mix_p1.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Transformer_CNN_Unet_mix_p2":
+        from Models import Transformer_CNN_Unet_mix_p2
+        model = Transformer_CNN_Unet_mix_p2.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_CNN_Unet_mix_p2.Loss()
         learning_rate = 1e-3
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         if torch.cuda.device_count() > 1:

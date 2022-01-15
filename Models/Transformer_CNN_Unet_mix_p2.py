@@ -37,19 +37,19 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         channel, height, width = input_shape
-        self.name = "Transformer_pure"
+        self.name = "Transformer_CNN_Unet_mix_p2"
         self.down1 = TransformerStackEncoder(channel, 12, 256, 8)
-        self.down2 = TransformerStackEncoder(12, 24, 128, 8)
-        self.down3 = TransformerStackEncoder(24, 46, 64, 4)
-        self.down4 = TransformerStackEncoder(46, 64, 32, 4)
-        self.down5 = TransformerStackEncoder(64, 128, 16, 4)
+        self.down2 = StackEncoder(12, 24, kernel_size=(3, 3))
+        self.down3 = StackEncoder(24, 46, kernel_size=(3, 3))
+        self.down4 = StackEncoder(46, 64, kernel_size=(3, 3))
+        self.down5 = StackEncoder(64, 128, kernel_size=(3, 3))
 
-        self.center = TransformerBlock(128, 128, 8, 2)
+        self.center = ConvBlock(128, 128, kernel_size=(3, 3), padding=1)
 
-        self.up5 = TransformerStackDecoder(128, 128, 64, 16, 4)
-        self.up4 = TransformerStackDecoder(64, 64, 46, 32, 4)
-        self.up3 = TransformerStackDecoder(46, 46, 24, 64, 4)
-        self.up2 = TransformerStackDecoder(24, 24, 12, 128, 8)
+        self.up5 = StackDecoder(128, 128, 64, kernel_size=(3, 3))
+        self.up4 = StackDecoder(64, 64, 46, kernel_size=(3, 3))
+        self.up3 = StackDecoder(46, 46, 24, kernel_size=(3, 3))
+        self.up2 = StackDecoder(24, 24, 12, kernel_size=(3, 3))
         self.up1 = TransformerStackDecoder(12, 12, 12, 256, 8)
         self.conv = OutConv(12, 1)
 

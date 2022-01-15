@@ -1,7 +1,7 @@
 {
     "general":{
-        "models":["Unet","Unet_pro","Transformer_CNN_Unet_mix","Transformer_pure"],
-        "chosen_models":[0,1,2,3],
+        "models":["Unet","Unet_pro","Transformer_CNN_Unet_mix_p1","Transformer_CNN_Unet_mix_p2","Transformer_pure"],
+        "chosen_models":[0,1,2,3,4],
         "datasets":["Brain Dummy","Brain MRI"],
         "chosen_dataset":0,
         "width":256,

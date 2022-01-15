@@ -30,16 +30,16 @@ class Model(nn.Module):
         self.name = "Unet"
         channel,height,width = input_shape
         
-        self.down1 = StackEncoder(channel,12,kernel_size=(3,3))  #256
-        self.down2 = StackEncoder(12,24,kernel_size=(3,3))  # 128
-        self.down3 = StackEncoder(24,46,kernel_size=(3,3))  # 64
-        self.down4 = StackEncoder(46,64,kernel_size=(3,3))  # 32
-        self.down5 = StackEncoder(64,128,kernel_size=(3,3))  #16
+        self.down1 = StackEncoder(channel,12,kernel_size=(3,3))  
+        self.down2 = StackEncoder(12,24,kernel_size=(3,3))  
+        self.down3 = StackEncoder(24,46,kernel_size=(3,3))  
+        self.down4 = StackEncoder(46,64,kernel_size=(3,3))  
+        self.down5 = StackEncoder(64,128,kernel_size=(3,3)) 
         
-        self.center = ConvBlock(128,128,kernel_size=(3,3),padding=1) #16
+        self.center = ConvBlock(128,128,kernel_size=(3,3),padding=1)
         
-        self.up5 = StackDecoder(128,128,64,kernel_size=(3,3))  #32
-        self.up4 = StackDecoder(64,64,46,kernel_size=(3,3)) #64
+        self.up5 = StackDecoder(128,128,64,kernel_size=(3,3)) 
+        self.up4 = StackDecoder(64,64,46,kernel_size=(3,3))
         self.up3 = StackDecoder(46,46,24,kernel_size=(3,3))
         self.up2 = StackDecoder(24,24,12,kernel_size=(3,3))
         self.up1 = StackDecoder(12,12,12,kernel_size=(3,3))
