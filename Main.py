@@ -104,6 +104,17 @@ def init_models(name, config):
             print("Let's use", torch.cuda.device_count(), "GPUs!")
             model = torch.nn.DataParallel(model)
         return model, criterion, optimizer
+    elif name == "Transformer_CNN_Unet_mix_p3":
+        from Models import Transformer_CNN_Unet_mix_p3
+        model = Transformer_CNN_Unet_mix_p3.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_CNN_Unet_mix_p3.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
     elif name == "Transformer_pure":
         from Models import Transformer_pure
         model = Transformer_pure.Model(

@@ -1,24 +1,24 @@
 {
     "general":{
-        "models":["Unet","Unet_pro","Transformer_CNN_Unet_mix_p1","Transformer_CNN_Unet_mix_p2","Transformer_pure"],
-        "chosen_models":[0,1,2,3,4],
+        "models":["Unet","Unet_pro","Transformer_pure","Transformer_CNN_Unet_mix_p1","Transformer_CNN_Unet_mix_p2","Transformer_CNN_Unet_mix_p3"],
+        "chosen_models":[0,1,2,3,4,5],
         "datasets":["Brain Dummy","Brain MRI"],
-        "chosen_dataset":0,
+        "chosen_dataset":1,
         "width":256,
         "height":256,
         "input_channels":3,
-        "epochs":3,
+        "epochs":100,
         "batch_size":16,
         "augmentation":true,
         "if_save_models":false
     },
     "data":{
         "Brain Dummy":{
-            "data_path":"C:/Users/WhuLi/Documents/archive/lgg-mri-segmentation/dummy/",
+            "data_path":"./archive/lgg-mri-segmentation/dummy/",
             "data_loader":1
         },
         "Brain MRI":{
-            "data_path":"C:/Users/WhuLi/Documents/archive/lgg-mri-segmentation/kaggle_3m/",
+            "data_path":"./archive/lgg-mri-segmentation/kaggle_3m/",
             "data_loader":1
         }
     },
