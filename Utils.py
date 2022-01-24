@@ -2,11 +2,13 @@ import os
 import json
 import numpy as np
 import pandas
+import cv2
 from skimage import io, transform
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 import torch
 import time
+from os import listdir
 from torchvision import transforms as T
 
 
@@ -91,8 +93,52 @@ class Brain_data(Dataset):
                             (0.229, 0.224, 0.225))(image)
         return (image, mask)
 
+class Breast_dataset(Dataset):
 
-def save_log(name, config, train_loss, test_loss, path="Logs/", evaluations=None):
+    def __init__(self,path,transforms=None):
+        self.path = path
+        self.transform = transforms
+        self.images = []
+        self.masks = []
+        for img in listdir(self.path):
+            if img[-8:] == "mask.png" :
+                self.masks.append(os.path.join(self.path, img))
+            elif img[-5:] == ").png":
+                self.images.append(os.path.join(self.path, img))
+        self.images = sorted(self.images)
+        self.masks = sorted(self.masks)
+    def __getitem__(self,idx):
+        image = self.images[idx]
+        mask = self.masks[idx]
+
+
+        image = cv2.imread(image)
+        image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB).astype(np.float32)
+        mask = cv2.imread(mask)
+        mask = cv2.cvtColor(mask,cv2.COLOR_BGR2GRAY)
+        image = image / 255
+        mask = mask / 255
+        if self.transform is not None:
+            aug = self.transform(image=image, mask=mask)
+            image = aug['image']
+            mask = aug['mask']
+
+        image = image.transpose((2, 0, 1))
+        mask = np.expand_dims(mask, axis=-1).transpose((2, 0, 1))
+
+        image = torch.from_numpy(image)
+        mask = torch.from_numpy(mask)
+        # 简单预处理
+        image = T.Normalize((0.485, 0.456, 0.406),
+                            (0.229, 0.224, 0.225))(image)
+        return (image, mask)
+
+
+    def __len__(self):
+        return len(self.images)
+
+
+def save_log(name, config, train_loss, test_loss,datasets, path="Logs/", evaluations=None):
     date = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(time.time()))
     source = {
         'train_loss': train_loss,
@@ -101,7 +147,7 @@ def save_log(name, config, train_loss, test_loss, path="Logs/", evaluations=None
         'batch_size': config["general"]["batch_size"],
         'epochs': config["general"]["epochs"],
         'if_augmentation': config["general"]["augmentation"],
-        'datasets': config["general"]["datasets"][config["general"]["chosen_dataset"]]
+        'datasets': datasets
     }
     if evaluations:
         source.update(evaluations)
@@ -115,10 +161,11 @@ def show_config(config):
     for i in config["general"]["chosen_models"]:
         model_name = config["general"]["models"][i]
         print("\t"+model_name)
-    print("On dataset:")
-    print("\t"+config["general"]["datasets"]
-          [config["general"]["chosen_dataset"]])
+    print("On datasets:")
+    for i in config["general"]["chosen_datasets"]:
+        dataset_name = config["general"]["datasets"][i]
+        print("\t"+dataset_name)
     print("Using evaluation:")
-    for e in config["evaluation"]["chosen_methods"]:
-        method_name = config["evaluation"]["methods"][e]
+    for i in config["evaluation"]["chosen_methods"]:
+        method_name = config["evaluation"]["methods"][i]
         print("\t"+method_name)

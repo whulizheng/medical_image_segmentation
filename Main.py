@@ -33,16 +33,27 @@ def define_augmentation(if_aug, width, height):
         ])
 
 
-def dataset_prepare(config, transform):
-    dataset = Utils.Brain_data(
-        config["data"][config["general"]["datasets"][config["general"]["chosen_dataset"]]]["data_path"], transform)
-    trainset, testset = random_split(dataset, [int(
-        dataset.__len__()*0.9), int(dataset.__len__()-int(dataset.__len__()*0.9))])
-    train_loader = torch.utils.data.DataLoader(
-        dataset=trainset, batch_size=config["general"]["batch_size"], shuffle=True)
-    test_loader = torch.utils.data.DataLoader(
-        dataset=testset, batch_size=config["general"]["batch_size"])
-    return train_loader, test_loader
+def dataset_prepare(config, transform, name):
+    if name == "Brain MRI":
+        dataset = Utils.Brain_data(
+            config["data"]["Brain MRI"]["data_path"], transform)
+        trainset, testset = random_split(dataset, [int(
+            dataset.__len__()*0.9), int(dataset.__len__()-int(dataset.__len__()*0.9))])
+        train_loader = torch.utils.data.DataLoader(
+            dataset=trainset, batch_size=config["general"]["batch_size"], shuffle=True)
+        test_loader = torch.utils.data.DataLoader(
+            dataset=testset, batch_size=config["general"]["batch_size"])
+        return train_loader, test_loader
+    elif name == "Breast Cancer":
+        dataset = Utils.Breast_dataset(
+            config["data"]["Breast Cancer"]["data_path"], transform)
+        trainset, testset = random_split(dataset, [int(
+            dataset.__len__()*0.9), int(dataset.__len__()-int(dataset.__len__()*0.9))])
+        train_loader = torch.utils.data.DataLoader(
+            dataset=trainset, batch_size=config["general"]["batch_size"], shuffle=True)
+        test_loader = torch.utils.data.DataLoader(
+            dataset=testset, batch_size=config["general"]["batch_size"])
+        return train_loader, test_loader
 
 
 def init_evaluation(name, config):
@@ -131,7 +142,7 @@ def init_models(name, config):
         exit(-1)
 
 
-def train(model,criterion,optimizer, device, train_loader, test_loader, epochs):
+def train(model, criterion, optimizer, device, train_loader, test_loader, epochs):
     train_loss = []
     test_loss = []
     for epoch in range(epochs):
@@ -181,50 +192,53 @@ def main():
     if config["general"]["augmentation"]:
         print("Data Augmenting...")
     # prepare dataset
-    train_loader, test_loader = dataset_prepare(config, transform)
-    # train model
-    for i in config["general"]["chosen_models"]:
-        # init model
-        model_name = config["general"]["models"][i]
-        print("Training model: "+model_name)
-        model, criterion, optimizer = init_models(model_name, config)
-        model.to(device)
+    for k in config["general"]["chosen_datasets"]:
+        dataset_name = config["general"]["datasets"][k]
+        train_loader, test_loader = dataset_prepare(config, transform,dataset_name)
+        # train model
+        for i in config["general"]["chosen_models"]:
+            # init model
+            model_name = config["general"]["models"][i]
+            print("Training model: "+model_name + "On " + dataset_name)
+            model, criterion, optimizer = init_models(model_name, config)
+            model.to(device)
 
-        # train
-        epochs = config["general"]["epochs"]
-        model, train_loss, test_loss = train(
-            model,criterion,optimizer, device, train_loader, test_loader, epochs)
+            # train
+            epochs = config["general"]["epochs"]
+            model, train_loss, test_loss = train(
+                model, criterion, optimizer, device, train_loader, test_loader, epochs)
 
-        # evaluation
-        evaluations = {}
-        for e in config["evaluation"]["chosen_methods"]:
-            method_name = config["evaluation"]["methods"][e]
-            print("Evaluating Model: "+model_name+" By "+method_name)
-            method = init_evaluation(method_name, config)
-            scores = []
-            with torch.no_grad():
-                for image, mask in test_loader:
-                    image = image.to(device, dtype=torch.float)
-                    mask = mask.to(device, dtype=torch.float)
-                    pred_mask = model.forward(image)
-                    score = method(pred_mask, mask)
-                    scores.append(score.item())
-            evaluations[method_name] = np.mean(scores)
-            print("Model: "+model_name+" Got "+method_name +
-                  ": "+str(float(np.mean(scores))))
+            # evaluation
+            evaluations = {}
+            for e in config["evaluation"]["chosen_methods"]:
+                method_name = config["evaluation"]["methods"][e]
+                print("Evaluating Model: "+model_name+" By "+method_name + "On " + dataset_name)
+                method = init_evaluation(method_name, config)
+                scores = []
+                with torch.no_grad():
+                    for image, mask in test_loader:
+                        image = image.to(device, dtype=torch.float)
+                        mask = mask.to(device, dtype=torch.float)
+                        pred_mask = model.forward(image)
+                        score = method(pred_mask, mask)
+                        scores.append(score.item())
+                evaluations[method_name] = np.mean(scores)
+                print("Model: "+model_name+" Got "+method_name +
+                    ": "+str(float(np.mean(scores))))
 
-        # save_log
-        Utils.save_log(model_name, config, train_loss, test_loss, evaluations=evaluations)
+            # save_log
+            Utils.save_log(model_name, config, train_loss,
+                        test_loss,datasets = dataset_name, evaluations=evaluations)
 
-        # save_model
-        if config["general"]["if_save_models"]:
-            date = time.strftime('%Y_%m_%d_%H_%M_%S',
-                                 time.localtime(time.time()))
-            path = "Saved_models/" + model_name + "_" + date + ".pt"
-            torch.save(model, path)
-            print("model "+model_name+" saved at: "+path)
-        
-        del model, criterion, optimizer
+            # save_model
+            if config["general"]["if_save_models"]:
+                date = time.strftime('%Y_%m_%d_%H_%M_%S',
+                                    time.localtime(time.time()))
+                path = "Saved_models/" + model_name + "_" + date + ".pt"
+                torch.save(model, path)
+                print("model "+model_name+" saved at: "+path)
+
+            del model, criterion, optimizer
 
 
 if __name__ == "__main__":
