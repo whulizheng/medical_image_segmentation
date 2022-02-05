@@ -74,11 +74,13 @@ class Model(nn.Module):
 
 
 class TransformerStackEncoder(nn.Module):
-    def __init__(self, channel1, channel2, img_size, patch_size):
+    def __init__(self, channel1, channel2,img_size, patch_size):
         super(TransformerStackEncoder, self).__init__()
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.block = TransformerBlock(channel1, channel2, img_size, patch_size)
-
+        self.block = nn.Sequential(
+            TransformerBlock(channel1,channel2,img_size, patch_size),
+            TransformerBlock(channel2,channel2,img_size, patch_size),
+        )
     def forward(self, x):
         big_out = self.block(x)
         poolout = self.maxpool(big_out)
@@ -89,9 +91,9 @@ class TransformerStackDecoder(nn.Module):
     def __init__(self, big_channel, channel1, channel2, img_size, patch_size):
         super(TransformerStackDecoder, self).__init__()
         self.block = nn.Sequential(
-            TransformerBlock(channel1+big_channel, channel2,
-                             img_size, patch_size),
-            TransformerBlock(channel2, channel2, img_size, patch_size),
+            TransformerBlock(channel1+big_channel,channel2,img_size, patch_size),
+            TransformerBlock(channel2,channel2,img_size, patch_size),
+            TransformerBlock(channel2,channel2,img_size, patch_size),
         )
 
     def forward(self, x, down_tensor):
@@ -194,7 +196,7 @@ class MultiHeadAttention(nn.Module):
         self.values = nn.Linear(emb_size, emb_size*self.num_heads)
 
         self.multihead_attn = nn.MultiheadAttention(
-            emb_size*self.num_heads, 8, batch_first=True, dropout=dropout)  # 多头部分自己处理，所以这里只是调用torch的attention
+            emb_size*self.num_heads, 1, batch_first=True, dropout=dropout)  # 多头部分自己处理，所以这里只是调用torch的attention
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         queries = self.queries(x)
@@ -214,9 +216,9 @@ class SpecialResidualAdd(nn.Module):
         self.fn = fn
 
     def forward(self, x, **kwargs):
-        tmp = torch.unsqueeze(x, 0)
+        tmp = torch.unsqueeze(x,0)
         for i in range(self.channels-1):
-            tmp = torch.cat((tmp, torch.unsqueeze(x, 0)), 0)
+            tmp = torch.cat((tmp,torch.unsqueeze(x,0)),0)
         tmp = rearrange(tmp, "h b n d -> b h n d")
         x = self.fn(x, **kwargs)
         x += tmp
@@ -227,13 +229,12 @@ class ResidualAdd(nn.Module):
     def __init__(self, fn):
         super().__init__()
         self.fn = fn
-
+        
     def forward(self, x, **kwargs):
         res = x
         x = self.fn(x, **kwargs)
         x += res
         return x
-
 
 class FeedForwardBlock(nn.Sequential):
     def __init__(self, emb_size: int, expansion: int = 4, drop_p: float = 0.):
@@ -256,7 +257,7 @@ class TransformerEncoder(nn.Sequential):
         super().__init__(
             SpecialResidualAdd(nn.Sequential(
                 nn.LayerNorm(emb_size),
-                MultiHeadAttention(channels, emb_size, **kwargs),
+                MultiHeadAttention(channels,emb_size, **kwargs),
                 nn.Dropout(drop_p)
             ), channels),
             ResidualAdd(nn.Sequential(
@@ -271,21 +272,24 @@ class TransformerEncoder(nn.Sequential):
 class TransformerBlock(nn.Module):
     def __init__(self, in_channels, out_channels, img_size, patch_size):
         super(TransformerBlock, self).__init__()
-        emb_size = (patch_size**2)
+        self.emb_size = (patch_size**2)
         self.patch_size = patch_size
         self.img_size = img_size
         self.batchnorm = nn.BatchNorm2d(out_channels, eps=1e-4)
         self.pe = PatchEmbedding(
-            in_channels=in_channels, out_channels=out_channels, emb_size=emb_size, patch_size=patch_size, img_size=img_size)
+            in_channels=in_channels, out_channels=out_channels, emb_size=self.emb_size, patch_size=patch_size, img_size=img_size)
         self.encoder = TransformerEncoder(
-            channels=out_channels, emb_size=emb_size)
+            channels=out_channels, emb_size=self.emb_size)
         self.relu = nn.ReLU(inplace=True)
-
+        self.deconv = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, 1, 1, 0)
+        )
     def forward(self, x):
         out = self.pe(x)
         out = self.encoder(out)
         out = rearrange(out, "b h (n o) (s p) -> b h (n s) (o p)",
                         n=int(self.img_size/self.patch_size), s=self.patch_size)
+        out = self.deconv(out)
         out = self.batchnorm(out)
         out = self.relu(out)
         return out

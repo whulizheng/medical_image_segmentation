@@ -37,29 +37,33 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         channel, height, width = input_shape
-        self.name = "Transformer_pure"
-        self.down1 = TransformerStackEncoder(channel, 12, 256, 8)
-        self.down2 = TransformerStackEncoder(12, 24, 128, 8)
-        self.down3 = TransformerStackEncoder(24, 46, 64, 4)
-        self.down4 = TransformerStackEncoder(46, 64, 32, 4)
-        self.down5 = TransformerStackEncoder(64, 128, 16, 4)
+        self.name = "Transformer_CNN_Unet_mix_p5"
+        
+        self.down1 = StackEncoder(channel,12,kernel_size=(3,3))  # in: 256, out: 128
+        self.down2 = StackEncoder(12,24,kernel_size=(3,3))  
+        self.down3 = StackEncoder(24,46,kernel_size=(3,3))  
+        self.down4 = StackEncoder(46,64,kernel_size=(3,3))  
+        self.down5 = StackEncoder(64,128,kernel_size=(3,3)) 
+        
+        self.center = ConvBlock(128,128,kernel_size=(3,3),padding=1)
+        
+        self.up5 = StackDecoder(128,128,64,kernel_size=(3,3)) 
+        self.up4 = StackDecoder(64,64,46,kernel_size=(3,3))
+        self.up3 = StackDecoder(46,46,24,kernel_size=(3,3))
+        self.up2 = StackDecoder(24,24,12,kernel_size=(3,3))
+        self.up1 = StackDecoder(12,12,12,kernel_size=(3,3))
+        self.conv = OutConv(12,1)
 
-        self.center = TransformerBlock(128, 128, 8, 2)
-
-        self.up5 = TransformerStackDecoder(128, 128, 64, 16, 4)
-        self.up4 = TransformerStackDecoder(64, 64, 46, 32, 4)
-        self.up3 = TransformerStackDecoder(46, 46, 24, 64, 4)
-        self.up2 = TransformerStackDecoder(24, 24, 12, 128, 8)
-        self.up1 = TransformerStackDecoder(12, 12, 12, 256, 8)
-        self.conv = OutConv(12, 1)
+        self.bridge = TransformerBlock(128,128,16,4)
 
     def forward(self, x):
         down1, out = self.down1(x)
+        
         down2, out = self.down2(out)
         down3, out = self.down3(out)
         down4, out = self.down4(out)
         down5, out = self.down5(out)
-
+        down5 = self.bridge(down5)
         out = self.center(out)
 
         up5 = self.up5(out, down5)
@@ -79,7 +83,6 @@ class TransformerStackEncoder(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.block = nn.Sequential(
             TransformerBlock(channel1,channel2,img_size, patch_size),
-            TransformerBlock(channel2,channel2,img_size, patch_size),
         )
     def forward(self, x):
         big_out = self.block(x)
@@ -92,7 +95,6 @@ class TransformerStackDecoder(nn.Module):
         super(TransformerStackDecoder, self).__init__()
         self.block = nn.Sequential(
             TransformerBlock(channel1+big_channel,channel2,img_size, patch_size),
-            TransformerBlock(channel2,channel2,img_size, patch_size),
             TransformerBlock(channel2,channel2,img_size, patch_size),
         )
 
@@ -289,7 +291,6 @@ class TransformerBlock(nn.Module):
         out = self.encoder(out)
         out = rearrange(out, "b h (n o) (s p) -> b h (n s) (o p)",
                         n=int(self.img_size/self.patch_size), s=self.patch_size)
-        out = self.deconv(out)
         out = self.deconv(out)
         out = self.batchnorm(out)
         out = self.relu(out)

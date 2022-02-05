@@ -3,42 +3,44 @@
         "models": [
             "Unet",
             "Unet_pro",
+            "Unet_pro_mix",
             "Transformer_pure",
             "Transformer_CNN_Unet_mix_p1",
             "Transformer_CNN_Unet_mix_p2",
-            "Transformer_CNN_Unet_mix_p3"
+            "Transformer_CNN_Unet_mix_p3",
+            "Transformer_CNN_Unet_mix_p4",
+            "Transformer_CNN_Unet_mix_p5",
+            "Transformer_CNN_Unet_mix_p6",
+            "FCN",
+            "FCN_mix",
+            "Attention_Unet"
         ],
         "chosen_models": [
-            3,
-            4,
-            5
+            0,1,2,9,10,11,12
         ],
         "datasets": [
             "Brain MRI",
             "Breast Cancer"
         ],
         "chosen_datasets": [
+            0,
             1
         ],
         "width": 256,
         "height": 256,
         "input_channels": 3,
-        "epochs": 64,
+        "epochs": 150,
         "batch_size": 16,
         "augmentation": true,
         "if_save_models": false
     },
     "data": {
-        "Brain Dummy": {
-            "data_path": "C:/Users/WhuLi/Documents/archive/Breast Cancer/",
-            "data_loader": 1
-        },
         "Brain MRI": {
-            "data_path": "C:/Users/WhuLi/Documents/archive/lgg-mri-segmentation/kaggle_3m/",
+            "data_path": "./archive/lgg-mri-segmentation/kaggle_3m/",
             "data_loader": 1
         },
         "Breast Cancer": {
-            "data_path": "C:/Users/WhuLi/Documents/archive/Breast Cancer/",
+            "data_path": "./archive/Breast Cancer/",
             "data_loader": 2
         }
     },

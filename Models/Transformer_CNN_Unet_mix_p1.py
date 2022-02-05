@@ -33,51 +33,64 @@ from skimage import io, transform
 
 
 class Model(nn.Module):
-    def __init__(self, input_shape,patch_size = 8):
+    def __init__(self, input_shape, patch_size=8):
         super(Model, self).__init__()
 
         channel, height, width = input_shape
         self.name = "Transformer_CNN_Unet_mix_p1"
-        self.down1 = StackEncoder(channel,12,kernel_size=(3,3))  # in: 256, out: 128
-        self.down2 = StackEncoder(12,24,kernel_size=(3,3))  # in: 128, out: 64
-        self.down3 = StackEncoder(24,46,kernel_size=(3,3))  # in: 64, out: 32
-        self.down4 = StackEncoder(46,64,kernel_size=(3,3))  # in: 32, out: 16
-        self.down5 = TransformerStackEncoder(64,128,16,4) # in: 16, out: 8
-        
-        self.center = ConvBlock(128,128,kernel_size=(3,3),padding=1)# in: 8, out: 8
-        
-        self.up5 = TransformerStackDecoder(128,128,64,16,4) # in: 8, out: 16
-        self.up4 = StackDecoder(64,64,46,kernel_size=(3,3))# in: 16, out: 32
-        self.up3 = StackDecoder(46,46,24,kernel_size=(3,3))# in: 32, out: 64
-        self.up2 = StackDecoder(24,24,12,kernel_size=(3,3))# in: 64, out: 128
-        self.up1 = StackDecoder(12,12,12,kernel_size=(3,3))# in: 128, out: 256
-        self.conv = OutConv(12,1)
+        self.down1 = StackEncoder(
+            channel, 12, kernel_size=(3, 3))  # in: 256, out: 128
+        self.down2 = StackEncoder(
+            12, 24, kernel_size=(3, 3))  # in: 128, out: 64
+        self.down3 = StackEncoder(
+            24, 46, kernel_size=(3, 3))  # in: 64, out: 32
+        self.down4 = StackEncoder(
+            46, 64, kernel_size=(3, 3))  # in: 32, out: 16
+        self.down5 = TransformerStackEncoder(64, 128, 16, 4)  # in: 16, out: 8
+
+        self.center = ConvBlock(128, 128, kernel_size=(
+            3, 3), padding=1)  # in: 8, out: 8
+
+        self.up5 = TransformerStackDecoder(
+            128, 128, 64, 16, 4)  # in: 8, out: 16
+        self.up4 = StackDecoder(
+            64, 64, 46, kernel_size=(3, 3))  # in: 16, out: 32
+        self.up3 = StackDecoder(
+            46, 46, 24, kernel_size=(3, 3))  # in: 32, out: 64
+        self.up2 = StackDecoder(
+            24, 24, 12, kernel_size=(3, 3))  # in: 64, out: 128
+        self.up1 = StackDecoder(
+            12, 12, 12, kernel_size=(3, 3))  # in: 128, out: 256
+        self.conv = OutConv(12, 1)
 
     def forward(self, x):
-        down1,out = self.down1(x)  
-        down2,out = self.down2(out)  
-        down3,out = self.down3(out)
-        down4,out = self.down4(out)
-        down5,out = self.down5(out)
-        
-        
+        down1, out = self.down1(x)
+        down2, out = self.down2(out)
+        down3, out = self.down3(out)
+        down4, out = self.down4(out)
+        down5, out = self.down5(out)
+
         out = self.center(out)
-        
-        up5 = self.up5(out,down5)
-        up4 = self.up4(up5,down4)
-        up3 = self.up3(up4,down3)
-        up2 = self.up2(up3,down2)
-        up1 = self.up1(up2,down1)
-        
+
+        up5 = self.up5(out, down5)
+        up4 = self.up4(up5, down4)
+        up3 = self.up3(up4, down3)
+        up2 = self.up2(up3, down2)
+        up1 = self.up1(up2, down1)
+
         out = self.conv(up1)
 
         return out
+
 
 class TransformerStackEncoder(nn.Module):
     def __init__(self, channel1, channel2,img_size, patch_size):
         super(TransformerStackEncoder, self).__init__()
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.block = TransformerBlock(channel1,channel2,img_size, patch_size)
+        self.block = nn.Sequential(
+            TransformerBlock(channel1,channel2,img_size, patch_size),
+            TransformerBlock(channel2,channel2,img_size, patch_size),
+        )
     def forward(self, x):
         big_out = self.block(x)
         poolout = self.maxpool(big_out)
@@ -89,6 +102,7 @@ class TransformerStackDecoder(nn.Module):
         super(TransformerStackDecoder, self).__init__()
         self.block = nn.Sequential(
             TransformerBlock(channel1+big_channel,channel2,img_size, patch_size),
+            TransformerBlock(channel2,channel2,img_size, patch_size),
             TransformerBlock(channel2,channel2,img_size, patch_size),
         )
 
@@ -192,7 +206,7 @@ class MultiHeadAttention(nn.Module):
         self.values = nn.Linear(emb_size, emb_size*self.num_heads)
 
         self.multihead_attn = nn.MultiheadAttention(
-            emb_size*self.num_heads, 8, batch_first=True, dropout=dropout)  # 多头部分自己处理，所以这里只是调用torch的attention
+            emb_size*self.num_heads, 1, batch_first=True, dropout=dropout)  # 多头部分自己处理，所以这里只是调用torch的attention
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         queries = self.queries(x)
@@ -268,20 +282,24 @@ class TransformerEncoder(nn.Sequential):
 class TransformerBlock(nn.Module):
     def __init__(self, in_channels, out_channels, img_size, patch_size):
         super(TransformerBlock, self).__init__()
-        emb_size = (patch_size**2)
+        self.emb_size = (patch_size**2)
         self.patch_size = patch_size
         self.img_size = img_size
         self.batchnorm = nn.BatchNorm2d(out_channels, eps=1e-4)
         self.pe = PatchEmbedding(
-            in_channels=in_channels, out_channels=out_channels, emb_size=emb_size, patch_size=patch_size, img_size=img_size)
+            in_channels=in_channels, out_channels=out_channels, emb_size=self.emb_size, patch_size=patch_size, img_size=img_size)
         self.encoder = TransformerEncoder(
-            channels=out_channels, emb_size=emb_size)
+            channels=out_channels, emb_size=self.emb_size)
         self.relu = nn.ReLU(inplace=True)
+        self.deconv = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, 1, 1, 0)
+        )
     def forward(self, x):
         out = self.pe(x)
         out = self.encoder(out)
         out = rearrange(out, "b h (n o) (s p) -> b h (n s) (o p)",
                         n=int(self.img_size/self.patch_size), s=self.patch_size)
+        out = self.deconv(out)
         out = self.batchnorm(out)
         out = self.relu(out)
         return out

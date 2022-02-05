@@ -7,6 +7,8 @@ import time
 import Utils
 
 
+
+
 def device_prepare():
     if torch.cuda.is_available():
         print("Using GPU")
@@ -93,6 +95,17 @@ def init_models(name, config):
             print("Let's use", torch.cuda.device_count(), "GPUs!")
             model = torch.nn.DataParallel(model)
         return model, criterion, optimizer
+    elif name == "Unet_pro_mix":
+        from Models import Unet_pro_mix
+        model = Unet_pro_mix.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Unet_pro_mix.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
     elif name == "Transformer_CNN_Unet_mix_p1":
         from Models import Transformer_CNN_Unet_mix_p1
         model = Transformer_CNN_Unet_mix_p1.Model(
@@ -126,11 +139,83 @@ def init_models(name, config):
             print("Let's use", torch.cuda.device_count(), "GPUs!")
             model = torch.nn.DataParallel(model)
         return model, criterion, optimizer
+    elif name == "Transformer_CNN_Unet_mix_p4":
+        from Models import Transformer_CNN_Unet_mix_p4
+        model = Transformer_CNN_Unet_mix_p4.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_CNN_Unet_mix_p4.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Transformer_CNN_Unet_mix_p5":
+        from Models import Transformer_CNN_Unet_mix_p5
+        model = Transformer_CNN_Unet_mix_p5.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_CNN_Unet_mix_p5.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Transformer_CNN_Unet_mix_p6":
+        from Models import Transformer_CNN_Unet_mix_p6
+        model = Transformer_CNN_Unet_mix_p6.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Transformer_CNN_Unet_mix_p6.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
     elif name == "Transformer_pure":
         from Models import Transformer_pure
         model = Transformer_pure.Model(
             (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
         criterion = Transformer_pure.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "FCN":
+        from Models import FCN
+        import torchvision
+        pretrained_net = FCN.FeatureResNet()
+        pretrained_net.load_state_dict(torchvision.models.resnet34(pretrained=True).state_dict())
+        
+        model = FCN.Model((config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]), pretrained_net).cuda()
+        criterion = FCN.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "FCN_mix":
+        from Models import FCN_mix
+        import torchvision
+        pretrained_net = FCN_mix.FeatureResNet()
+        pretrained_net.load_state_dict(torchvision.models.resnet34(pretrained=True).state_dict())
+        
+        model = FCN_mix.Model((config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]), pretrained_net).cuda()
+        criterion = FCN_mix.Loss()
+        learning_rate = 1e-3
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            model = torch.nn.DataParallel(model)
+        return model, criterion, optimizer
+    elif name == "Attention_Unet":
+        from Models import Attention_Unet
+        model = Attention_Unet.Model(
+            (config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]))
+        criterion = Attention_Unet.Loss()
         learning_rate = 1e-3
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         if torch.cuda.device_count() > 1:
@@ -199,7 +284,7 @@ def main():
         for i in config["general"]["chosen_models"]:
             # init model
             model_name = config["general"]["models"][i]
-            print("Training model: "+model_name + "On " + dataset_name)
+            print("Training model: "+model_name + " On " + dataset_name)
             model, criterion, optimizer = init_models(model_name, config)
             model.to(device)
 
@@ -212,7 +297,7 @@ def main():
             evaluations = {}
             for e in config["evaluation"]["chosen_methods"]:
                 method_name = config["evaluation"]["methods"][e]
-                print("Evaluating Model: "+model_name+" By "+method_name + "On " + dataset_name)
+                print("Evaluating Model: "+model_name+" By "+method_name + " On " + dataset_name)
                 method = init_evaluation(method_name, config)
                 scores = []
                 with torch.no_grad():

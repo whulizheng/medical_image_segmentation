@@ -37,20 +37,29 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         channel, height, width = input_shape
-        self.name = "Transformer_pure"
-        self.down1 = TransformerStackEncoder(channel, 12, 256, 8)
-        self.down2 = TransformerStackEncoder(12, 24, 128, 8)
-        self.down3 = TransformerStackEncoder(24, 46, 64, 4)
-        self.down4 = TransformerStackEncoder(46, 64, 32, 4)
-        self.down5 = TransformerStackEncoder(64, 128, 16, 4)
+        self.name = "Transformer_CNN_Unet_mix_p1"
+        self.down1 = StackEncoder(
+            channel, 12, kernel_size=(3, 3))  # in: 256, out: 128
+        self.down2 = StackEncoder(
+            12, 24, kernel_size=(3, 3))  # in: 128, out: 64
+        self.down3 = StackEncoder(
+            24, 46, kernel_size=(3, 3))  # in: 64, out: 32
+        self.down4 = StackEncoder(
+            46, 64, kernel_size=(3, 3))  # in: 32, out: 16
+        self.down5 = StackEncoder(64, 128,kernel_size=(3, 3))  # in: 16, out: 8
 
-        self.center = TransformerBlock(128, 128, 8, 2)
+        self.center = TransformerBlock(128,128,8,2) # in: 8, out: 8
 
-        self.up5 = TransformerStackDecoder(128, 128, 64, 16, 4)
-        self.up4 = TransformerStackDecoder(64, 64, 46, 32, 4)
-        self.up3 = TransformerStackDecoder(46, 46, 24, 64, 4)
-        self.up2 = TransformerStackDecoder(24, 24, 12, 128, 8)
-        self.up1 = TransformerStackDecoder(12, 12, 12, 256, 8)
+        self.up5 = StackDecoder(
+            128, 128,64, kernel_size=(3, 3))  # in: 8, out: 16
+        self.up4 = StackDecoder(
+            64, 64, 46, kernel_size=(3, 3))  # in: 16, out: 32
+        self.up3 = StackDecoder(
+            46, 46, 24, kernel_size=(3, 3))  # in: 32, out: 64
+        self.up2 = StackDecoder(
+            24, 24, 12, kernel_size=(3, 3))  # in: 64, out: 128
+        self.up1 = StackDecoder(
+            12, 12, 12, kernel_size=(3, 3))  # in: 128, out: 256
         self.conv = OutConv(12, 1)
 
     def forward(self, x):
@@ -289,7 +298,6 @@ class TransformerBlock(nn.Module):
         out = self.encoder(out)
         out = rearrange(out, "b h (n o) (s p) -> b h (n s) (o p)",
                         n=int(self.img_size/self.patch_size), s=self.patch_size)
-        out = self.deconv(out)
         out = self.deconv(out)
         out = self.batchnorm(out)
         out = self.relu(out)
