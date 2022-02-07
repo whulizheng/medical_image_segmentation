@@ -56,6 +56,20 @@ def dataset_prepare(config, transform, name):
         test_loader = torch.utils.data.DataLoader(
             dataset=testset, batch_size=config["general"]["batch_size"])
         return train_loader, test_loader
+    elif name == "COVID-19":
+        dataset = Utils.Covid19_data(
+            config["data"]["COVID-19"]["data_path"], transform
+        )
+        trainset, testset = random_split(dataset, [int(
+            dataset.__len__()*0.9), int(dataset.__len__()-int(dataset.__len__()*0.9))])
+        train_loader = torch.utils.data.DataLoader(
+            dataset=trainset, batch_size=config["general"]["batch_size"], shuffle=True)
+        test_loader = torch.utils.data.DataLoader(
+            dataset=testset, batch_size=config["general"]["batch_size"])
+        return train_loader, test_loader
+    else:
+        print("Wrong dataset name")
+        exit(-1)
 
 
 def init_evaluation(name, config):

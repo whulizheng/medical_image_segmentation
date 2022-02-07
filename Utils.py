@@ -50,6 +50,48 @@ def plot_img(no_, loader, device):
     plt.show()
 
 
+class Covid19_data(Dataset):
+    def __init__(self, path, transform=None):
+        self.path = path
+        self.masks, self.images = [], []
+        self.transform = transform
+        for file in os.listdir(os.path.join(self.path, "frames")):
+            self.images.append(os.path.join(self.path, "frames", file))
+        for file in os.listdir(os.path.join(self.path, "masks")):
+            self.masks.append(os.path.join(self.path, "masks", file))
+
+        self.images = sorted(self.images)
+        self.masks = sorted(self.masks)
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        image = self.images[idx]
+        mask = self.masks[idx]
+
+        image = cv2.imread(image)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        mask = cv2.imread(mask)
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        image = image / 255
+        mask = mask / 255
+        if self.transform is not None:
+            aug = self.transform(image=image, mask=mask)
+            image = aug['image']
+            mask = aug['mask']
+
+        image = image.transpose((2, 0, 1))
+        mask = np.expand_dims(mask, axis=-1).transpose((2, 0, 1))
+
+        image = torch.from_numpy(image)
+        mask = torch.from_numpy(mask)
+        # 简单预处理
+        image = T.Normalize((0.485, 0.456, 0.406),
+                            (0.229, 0.224, 0.225))(image)
+        return (image, mask)
+
+
 class Brain_data(Dataset):
     def __init__(self, path, transform=None):
         self.path = path
@@ -70,52 +112,56 @@ class Brain_data(Dataset):
     def __len__(self):
         return len(self.images)
 
-    def __getitem__(self, idx):
-        image = self.images[idx]
-        mask = self.masks[idx]
 
-        image = io.imread(image)
-        image = image / 255
-        mask = io.imread(mask)
-        mask = mask / 255
-        if self.transform is not None:
-            aug = self.transform(image=image, mask=mask)
-            image = aug['image']
-            mask = aug['mask']
+def __getitem__(self, idx):
+    image = self.images[idx]
+    mask = self.masks[idx]
 
-        image = image.transpose((2, 0, 1))
-        mask = np.expand_dims(mask, axis=-1).transpose((2, 0, 1))
+    image = cv2.imread(image)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+    mask = cv2.imread(mask)
+    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    image = image / 255
+    mask = mask / 255
+    if self.transform is not None:
+        aug = self.transform(image=image, mask=mask)
+        image = aug['image']
+        mask = aug['mask']
 
-        image = torch.from_numpy(image)
-        mask = torch.from_numpy(mask)
-        # 简单预处理
-        image = T.Normalize((0.485, 0.456, 0.406),
-                            (0.229, 0.224, 0.225))(image)
-        return (image, mask)
+    image = image.transpose((2, 0, 1))
+    mask = np.expand_dims(mask, axis=-1).transpose((2, 0, 1))
+
+    image = torch.from_numpy(image)
+    mask = torch.from_numpy(mask)
+    # 简单预处理
+    image = T.Normalize((0.485, 0.456, 0.406),
+                        (0.229, 0.224, 0.225))(image)
+    return (image, mask)
+
 
 class Breast_dataset(Dataset):
 
-    def __init__(self,path,transforms=None):
+    def __init__(self, path, transforms=None):
         self.path = path
         self.transform = transforms
         self.images = []
         self.masks = []
         for img in listdir(self.path):
-            if img[-8:] == "mask.png" :
+            if img[-8:] == "mask.png":
                 self.masks.append(os.path.join(self.path, img))
             elif img[-5:] == ").png":
                 self.images.append(os.path.join(self.path, img))
         self.images = sorted(self.images)
         self.masks = sorted(self.masks)
-    def __getitem__(self,idx):
+
+    def __getitem__(self, idx):
         image = self.images[idx]
         mask = self.masks[idx]
 
-
         image = cv2.imread(image)
-        image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB).astype(np.float32)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
         mask = cv2.imread(mask)
-        mask = cv2.cvtColor(mask,cv2.COLOR_BGR2GRAY)
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         image = image / 255
         mask = mask / 255
         if self.transform is not None:
@@ -133,12 +179,11 @@ class Breast_dataset(Dataset):
                             (0.229, 0.224, 0.225))(image)
         return (image, mask)
 
-
     def __len__(self):
         return len(self.images)
 
 
-def save_log(name, config, train_loss, test_loss,datasets, path="Logs/", evaluations=None):
+def save_log(name, config, train_loss, test_loss, datasets, path="Logs/", evaluations=None):
     date = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(time.time()))
     source = {
         'train_loss': train_loss,
@@ -151,8 +196,8 @@ def save_log(name, config, train_loss, test_loss,datasets, path="Logs/", evaluat
     }
     if evaluations:
         source.update(evaluations)
-    
-    np.save(path+name+"_"+date+".log.npy",source)
+
+    np.save(path+name+"_"+date+".log.npy", source)
     print("log saved at: "+path+date+".log.npy")
 
 

@@ -20,16 +20,16 @@
         ],
         "datasets": [
             "Brain MRI",
-            "Breast Cancer"
+            "Breast Cancer",
+            "COVID-19"
         ],
         "chosen_datasets": [
-            0,
-            1
+            2
         ],
         "width": 256,
         "height": 256,
         "input_channels": 3,
-        "epochs": 150,
+        "epochs": 100,
         "batch_size": 16,
         "augmentation": true,
         "if_save_models": false
@@ -42,6 +42,10 @@
         "Breast Cancer": {
             "data_path": "./archive/Breast Cancer/",
             "data_loader": 2
+        },
+        "COVID-19": {
+            "data_path": "./archive/COVID-19/",
+            "data_loader": 3
         }
     },
     "evaluation": {
