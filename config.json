@@ -37,15 +37,18 @@
     "data": {
         "Brain MRI": {
             "data_path": "./archive/lgg-mri-segmentation/kaggle_3m/",
-            "data_loader": 1
+            "data_loader": 1,
+            "URL":"https://www.kaggle.com/datasets/mateuszbuda/lgg-mri-segmentation"
         },
         "Breast Cancer": {
             "data_path": "./archive/Breast Cancer/",
-            "data_loader": 2
+            "data_loader": 2,
+            "URL":"https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset"
         },
         "COVID-19": {
             "data_path": "./archive/COVID-19/",
-            "data_loader": 3
+            "data_loader": 3,
+            "URL":"https://www.kaggle.com/datasets/maedemaftouni/large-covid19-ct-slice-dataset"
         }
     },
     "evaluation": {

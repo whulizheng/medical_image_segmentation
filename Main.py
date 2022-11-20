@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset, DataLoader, random_split
+from matplotlib import pyplot as plt
 import torch
 import numpy as np
 import albumentations as A
@@ -203,7 +204,7 @@ def init_models(name, config):
         pretrained_net = FCN.FeatureResNet()
         pretrained_net.load_state_dict(torchvision.models.resnet34(pretrained=True).state_dict())
         
-        model = FCN.Model((config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]), pretrained_net).cuda()
+        model = FCN.Model((config["general"]["input_channels"], config["general"]["width"], config["general"]["height"]), pretrained_net)
         criterion = FCN.Loss()
         learning_rate = 1e-3
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -281,6 +282,7 @@ def train(model, criterion, optimizer, device, train_loader, test_loader, epochs
     return model, train_loss, test_loss
 
 
+
 def main():
     config = Utils.load_json("config.json")
     device = device_prepare()
@@ -304,9 +306,9 @@ def main():
 
             # train
             epochs = config["general"]["epochs"]
+            train_loss, test_loss = [[],[]]
             model, train_loss, test_loss = train(
                 model, criterion, optimizer, device, train_loader, test_loader, epochs)
-
             # evaluation
             evaluations = {}
             for e in config["evaluation"]["chosen_methods"]:
@@ -315,12 +317,15 @@ def main():
                 method = init_evaluation(method_name, config)
                 scores = []
                 with torch.no_grad():
+                    flag = 0
                     for image, mask in test_loader:
                         image = image.to(device, dtype=torch.float)
                         mask = mask.to(device, dtype=torch.float)
                         pred_mask = model.forward(image)
+                        Utils.save_outputs(image,mask,pred_mask,model_name,flag)
                         score = method(pred_mask, mask)
                         scores.append(score.item())
+                        flag+=1
                 evaluations[method_name] = np.mean(scores)
                 print("Model: "+model_name+" Got "+method_name +
                     ": "+str(float(np.mean(scores))))

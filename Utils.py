@@ -10,44 +10,13 @@ import torch
 import time
 from os import listdir
 from torchvision import transforms as T
+import torchvision
 
 
 def load_json(file_path):
     with open(file_path, 'r') as load_f:
         load_dict = json.load(load_f)
     return load_dict
-
-
-def image_convert(image):
-    image = image.clone().cpu().numpy()
-    image = image.transpose((1, 2, 0))
-    image = (image * 255)
-    return image
-
-
-def mask_convert(mask):
-    mask = mask.clone().cpu().detach().numpy()
-    return np.squeeze(mask)
-
-
-def plot_img(no_, loader, device):
-    iter_ = iter(loader)
-    images, masks = next(iter_)
-    images = images.to(device)
-    masks = masks.to(device)
-    plt.figure(figsize=(20, 10))
-    for idx in range(0, no_):
-        image = image_convert(images[idx])
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
-        image = (image * std + mean).astype(np.float32)
-        plt.subplot(2, no_, idx+1)
-        plt.imshow(image)
-    for idx in range(0, no_):
-        mask = mask_convert(masks[idx])
-        plt.subplot(2, no_, idx+no_+1)
-        plt.imshow(mask, cmap='gray')
-    plt.show()
 
 
 class Covid19_data(Dataset):
@@ -113,30 +82,30 @@ class Brain_data(Dataset):
         return len(self.images)
 
 
-def __getitem__(self, idx):
-    image = self.images[idx]
-    mask = self.masks[idx]
+    def __getitem__(self, idx):
+        image = self.images[idx]
+        mask = self.masks[idx]
 
-    image = cv2.imread(image)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
-    mask = cv2.imread(mask)
-    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    image = image / 255
-    mask = mask / 255
-    if self.transform is not None:
-        aug = self.transform(image=image, mask=mask)
-        image = aug['image']
-        mask = aug['mask']
+        image = cv2.imread(image)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        mask = cv2.imread(mask)
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        image = image / 255
+        mask = mask / 255
+        if self.transform is not None:
+            aug = self.transform(image=image, mask=mask)
+            image = aug['image']
+            mask = aug['mask']
 
-    image = image.transpose((2, 0, 1))
-    mask = np.expand_dims(mask, axis=-1).transpose((2, 0, 1))
+        image = image.transpose((2, 0, 1))
+        mask = np.expand_dims(mask, axis=-1).transpose((2, 0, 1))
 
-    image = torch.from_numpy(image)
-    mask = torch.from_numpy(mask)
-    # 简单预处理
-    image = T.Normalize((0.485, 0.456, 0.406),
-                        (0.229, 0.224, 0.225))(image)
-    return (image, mask)
+        image = torch.from_numpy(image)
+        mask = torch.from_numpy(mask)
+        # 简单预处理
+        image = T.Normalize((0.485, 0.456, 0.406),
+                            (0.229, 0.224, 0.225))(image)
+        return (image, mask)
 
 
 class Breast_dataset(Dataset):
@@ -214,3 +183,10 @@ def show_config(config):
     for i in config["evaluation"]["chosen_methods"]:
         method_name = config["evaluation"]["methods"][i]
         print("\t"+method_name)
+
+
+def save_outputs(images, masks, pred_masks,model_name,flag,path="tmp/"):
+    for i in range(len(images)):
+        torchvision.utils.save_image(images[i],path+model_name+"_"+str(flag)+"_"+str(i)+"_image.jpg")
+        torchvision.utils.save_image(pred_masks[i],path+model_name+"_"+str(flag)+"_"+str(i)+"_mask.jpg")
+        torchvision.utils.save_image(masks[i],path+model_name+"_"+str(flag)+"_"+str(i)+"_pred_mask.jpg")
